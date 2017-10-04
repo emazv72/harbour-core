@@ -64,15 +64,15 @@ ${hb_prefix}/package/harbour.hbc{hbdyn}
 "{hbdyn&android}-dflag=-Wl,-soname,${hb_dynprefix}${hb_outputname}${hb_dynext} -Wl,--no-undefined -Wl,-z,noexecstack"
 "{hbdyn&linux&!android}-dflag=-Wl,-soname,${hb_dynprefix}${hb_outputname}${hb_dynext}.${hb_major}.${hb_minor}"
 "{hbdyn&sunos}-dflag=-Wl,-h,${hb_dynprefix}${hb_outputname}${hb_dynext}.${hb_major}.${hb_minor}"
-"{hbdyn&win&(allmingw|allclang)}-dflag=-Wl,--major-image-version,${hb_major}"
-"{hbdyn&win&(allmingw|allclang)}-dflag=-Wl,--minor-image-version,${hb_minor}"
+"{hbdyn&win&(allmingw|allclang)&!__HB_3RD_DYN}-dflag=-Wl,--major-image-version,${hb_major}"
+"{hbdyn&win&(allmingw|allclang)&!__HB_3RD_DYN}-dflag=-Wl,--minor-image-version,${hb_minor}"
 
 # output name tweaks for dynamic libs
 # NOTE: We're altering previously set output name value here
 {hbdyn&unix&!darwin&!android&!cygwin}-o${hb_outputname}${hb_dynext}.${hb_major}.${hb_minor}.${hb_release}
 {hbdyn&unix&darwin}-o${hb_outputname}.${hb_major}.${hb_minor}.${hb_release}${hb_dynext}
 {hbdyn&unix&(cygwin|android)}-o${hb_outputname}${hb_dynext}
-{hbdyn&!unix&allwin}-o${hb_outputname}-${hb_major}${hb_minor}${hb_dynsuffix}
+{hbdyn&!unix&allwin&!__HB_3RD_DYN}-o${hb_outputname}-${hb_major}${hb_minor}${hb_dynsuffix}
 {hbdyn&!unix&!allwin}-o${hb_outputname}${hb_dynsuffix}
 
 # output dir (in sync with GNU Make)
