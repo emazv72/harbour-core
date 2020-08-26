@@ -2240,7 +2240,7 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
          break;
 
       case WM_RBUTTONDOWN:
-								 
+
          if( pWVT->bQuickEdit )
          {
             if( ! pWVT->bHasSelection )
@@ -2355,7 +2355,7 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
 
                RedrawWindow( pWVT->hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
 
-			 
+
 #if ! defined( UNICODE )
                PHB_CODEPAGE cdpHost = HB_GTSELF_HOSTCP( pWVT->pGT ),
                             cdpBox  = HB_GTSELF_BOXCP( pWVT->pGT );
@@ -3124,7 +3124,7 @@ if( pWVT->bQuickEdit && ! pWVT->bBeginMarked && pWVT->bHasSelection && ! pWVT->b
       ReleaseDC( pWVT->hWnd, hdc );
 
       DeleteObject( rgn );
-   }   
+   }
    EndPaint( pWVT->hWnd, &ps );
 }
 
@@ -3241,8 +3241,8 @@ static LRESULT CALLBACK hb_gt_wvt_WndProc( HWND hWnd, UINT message, WPARAM wPara
          return 0;
 
       case WM_SIZE:
-		 pWVT->bHasSelection     = HB_FALSE;
-		 pWVT->bSelectionUpdated = HB_FALSE;
+         pWVT->bHasSelection     = HB_FALSE;
+         pWVT->bSelectionUpdated = HB_FALSE;
          if( ! pWVT->bFullScreen )
          {
             if( pWVT->bResizing && pWVT->ResizeMode == HB_GTI_RESIZEMODE_ROWS )
