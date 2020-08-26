@@ -361,6 +361,8 @@ typedef struct
    HB_BOOL  bResizing;
    HB_BOOL  bAlreadySizing;
    HB_BOOL  bQuickEdit;
+   HB_BOOL  bHasSelection;
+   HB_BOOL  bSelectionUpdated;
 
    HB_BOOL  bComposited;
 

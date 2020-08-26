@@ -383,6 +383,8 @@ static PHB_GTWVT hb_gt_wvt_New( PHB_GT pGT, HINSTANCE hInstance, int iCmdShow )
    pWVT->bResizing         = HB_FALSE;
    pWVT->bAlreadySizing    = HB_FALSE;
    pWVT->bQuickEdit        = HB_FALSE;
+   pWVT->bHasSelection     = HB_FALSE;
+   pWVT->bSelectionUpdated = HB_FALSE;
 
    pWVT->bComposited       = HB_FALSE;
 
@@ -2214,6 +2216,10 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
       case WM_LBUTTONDOWN:
          if( pWVT->bBeginMarked || pWVT->bQuickEdit )
          {
+            pWVT->bHasSelection     = HB_FALSE;
+            pWVT->bSelectionUpdated = HB_FALSE;
+
+            RedrawWindow( pWVT->hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
             pWVT->bBeingMarked = HB_TRUE;
 
             pWVT->sRectNew.left   = xy.x;
@@ -2234,36 +2240,122 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
          break;
 
       case WM_RBUTTONDOWN:
+								 
+         if( pWVT->bQuickEdit )
+         {
+            if( ! pWVT->bHasSelection )
+            {
+               HB_GT_INFO gtInfo;
+
+               memset( &gtInfo, 0, sizeof( gtInfo ) );
+
+               hb_gtInfo( HB_GTI_CLIPBOARDPASTE, &gtInfo );
+
+               hb_gt_wvt_Composited( pWVT, HB_FALSE );
+               return;
+
+            }
+            else
+            {
+
+               pWVT->bHasSelection     = HB_FALSE;
+               pWVT->bSelectionUpdated = HB_FALSE;
+
+               RedrawWindow( pWVT->hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
+
+               {
+#if ! defined( UNICODE )
+                  PHB_CODEPAGE cdpHost = HB_GTSELF_HOSTCP( pWVT->pGT ),
+                               cdpBox  = HB_GTSELF_BOXCP( pWVT->pGT );
+#endif
+                  TCHAR * sBuffer;
+                  HB_SIZE nSize, n;
+                  int     row, col;
+                  RECT    rect;
+
+                  rect.left   = HB_MIN( pWVT->sRectNew.left, pWVT->sRectNew.right  );
+                  rect.top    = HB_MIN( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
+                  rect.right  = HB_MAX( pWVT->sRectNew.left, pWVT->sRectNew.right  );
+                  rect.bottom = HB_MAX( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
+
+                  rect = hb_gt_wvt_GetColRowFromXYRect( pWVT, rect );
+
+                  nSize = ( rect.bottom - rect.top + 1 ) *
+                          ( rect.right - rect.left + 1 + 2 );
+                  sBuffer = ( TCHAR * ) hb_xgrab( nSize * sizeof( TCHAR ) + 1 );
+
+                  for( n = 0, row = rect.top; row <= rect.bottom; row++ )
+                  {
+                     for( col = rect.left; col <= rect.right; col++ )
+                     {
+                        int       iColor;
+                        HB_BYTE   bAttr;
+                        HB_USHORT usChar;
+
+                        if( ! HB_GTSELF_GETSCRCHAR( pWVT->pGT, row, col, &iColor, &bAttr, &usChar ) )
+                           break;
+#if defined( UNICODE )
+                        usChar = hb_cdpGetU16Ctrl( usChar );
+#else
+                        usChar = hb_cdpGetUC( ( bAttr & HB_GT_ATTR_BOX ) ? cdpBox : cdpHost, usChar, '?' );
+#endif
+                        sBuffer[ n++ ] = ( TCHAR ) usChar;
+                     }
+                     if( rect.top < rect.bottom )
+                     {
+                        sBuffer[ n++ ] = '\r';
+                        sBuffer[ n++ ] = '\n';
+                     }
+                  }
+
+#if defined( UNICODE )
+                  if( n > 0 )
+                  {
+                     PHB_ITEM pItem = hb_itemPutStrLenU16( NULL, HB_CDP_ENDIAN_NATIVE, sBuffer, n );
+                     hb_gt_winapi_setClipboard( CF_UNICODETEXT, pItem );
+                     hb_itemRelease( pItem );
+                  }
+                  hb_xfree( sBuffer );
+#else
+                  if( n > 0 )
+                  {
+                     PHB_ITEM pItem = hb_itemPutCLPtr( NULL, sBuffer, n );
+                     hb_gt_winapi_setClipboard( pWVT->CodePage == OEM_CHARSET ?
+                                                CF_OEMTEXT : CF_TEXT, pItem );
+                     hb_itemRelease( pItem );
+                  }
+                  else
+                     hb_xfree( sBuffer );
+#endif
+               }
+
+               hb_gt_wvt_Composited( pWVT, HB_TRUE );
+               return;
+            }
+
+         }
+
          keyCode = K_RBUTTONDOWN;
          break;
 
       case WM_RBUTTONUP:
-         if( pWVT->bQuickEdit )
-         {
-            HB_GT_INFO gtInfo;
-
-            memset( &gtInfo, 0, sizeof( gtInfo ) );
-
-            hb_gtInfo( HB_GTI_CLIPBOARDPASTE, &gtInfo );
-
-            hb_gt_wvt_Composited( pWVT, HB_FALSE );
-
-            return;
-         }
-
          keyCode = K_RBUTTONUP;
          break;
 
       case WM_LBUTTONUP:
 
-         if( pWVT->bBeingMarked || pWVT->bQuickEdit )
+
+         if( pWVT->bBeingMarked )
          {
             pWVT->bBeginMarked = HB_FALSE;
             pWVT->bBeingMarked = HB_FALSE;
 
-            RedrawWindow( pWVT->hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
-
+            if( ! pWVT->bQuickEdit )
             {
+
+               RedrawWindow( pWVT->hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
+
+			 
 #if ! defined( UNICODE )
                PHB_CODEPAGE cdpHost = HB_GTSELF_HOSTCP( pWVT->pGT ),
                             cdpBox  = HB_GTSELF_BOXCP( pWVT->pGT );
@@ -2274,9 +2366,9 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
                RECT    rect;
 
                rect.left   = HB_MIN( pWVT->sRectNew.left, pWVT->sRectNew.right  );
-               rect.top    = HB_MIN( pWVT->sRectNew.top , pWVT->sRectNew.bottom );
+               rect.top    = HB_MIN( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
                rect.right  = HB_MAX( pWVT->sRectNew.left, pWVT->sRectNew.right  );
-               rect.bottom = HB_MAX( pWVT->sRectNew.top , pWVT->sRectNew.bottom );
+               rect.bottom = HB_MAX( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
 
                rect = hb_gt_wvt_GetColRowFromXYRect( pWVT, rect );
 
@@ -2288,8 +2380,8 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
                {
                   for( col = rect.left; col <= rect.right; col++ )
                   {
-                     int iColor;
-                     HB_BYTE bAttr;
+                     int       iColor;
+                     HB_BYTE   bAttr;
                      HB_USHORT usChar;
 
                      if( ! HB_GTSELF_GETSCRCHAR( pWVT->pGT, row, col, &iColor, &bAttr, &usChar ) )
@@ -2331,6 +2423,7 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
 
             hb_gt_wvt_Composited( pWVT, HB_TRUE );
             return;
+
          }
          keyCode = K_LBUTTONUP;
          break;
@@ -2386,6 +2479,7 @@ static void hb_gt_wvt_MouseEvent( PHB_GTWVT pWVT, UINT message, WPARAM wParam, L
 
                if( CombineRgn( rgn3, rgn1, rgn2, RGN_XOR ) != 0 )
                {
+                  pWVT->bHasSelection = HB_TRUE;
                   HDC hdc = GetDC( pWVT->hWnd );
                   InvertRgn( hdc, rgn3 );
                   ReleaseDC( pWVT->hWnd, hdc );
@@ -2998,6 +3092,39 @@ static void hb_gt_wvt_PaintText( PHB_GTWVT pWVT )
       if( len > 0 )
          hb_gt_wvt_TextOut( pWVT, hdc, startCol, iRow, iOldColor, pWVT->TextLine, ( UINT ) len );
    }
+
+if( pWVT->bQuickEdit && ! pWVT->bBeginMarked && pWVT->bHasSelection && ! pWVT->bSelectionUpdated )
+   {
+
+      pWVT->bSelectionUpdated = HB_TRUE;
+
+      RECT rect;
+
+      rect.left   = HB_MIN( pWVT->sRectNew.left, pWVT->sRectNew.right  );
+      rect.top    = HB_MIN( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
+      rect.right  = HB_MAX( pWVT->sRectNew.left, pWVT->sRectNew.right  );
+      rect.bottom = HB_MAX( pWVT->sRectNew.top, pWVT->sRectNew.bottom );
+      /* out of band cords may appear due to margins in maximized mode */
+      if( rect.left < 0 )
+         rect.left = 0;
+      if( rect.top < 0 )
+         rect.top = 0;
+      if( rect.right > pWVT->COLS * pWVT->PTEXTSIZE.x )
+         rect.right = pWVT->COLS * pWVT->PTEXTSIZE.x;
+      if( rect.bottom > pWVT->ROWS * pWVT->PTEXTSIZE.y )
+         rect.bottom = pWVT->ROWS * pWVT->PTEXTSIZE.y;
+
+      rect = hb_gt_wvt_GetXYFromColRowRect( pWVT,
+                                            hb_gt_wvt_GetColRowFromXYRect( pWVT, rect ) );
+
+      HRGN rgn = CreateRectRgn( rect.left, rect.top, rect.right, rect.bottom );
+
+      HDC hdc = GetDC( pWVT->hWnd );
+      InvertRgn( hdc, rgn );
+      ReleaseDC( pWVT->hWnd, hdc );
+
+      DeleteObject( rgn );
+   }   
    EndPaint( pWVT->hWnd, &ps );
 }
 
@@ -3099,6 +3226,8 @@ static LRESULT CALLBACK hb_gt_wvt_WndProc( HWND hWnd, UINT message, WPARAM wPara
       case WM_ENTERSIZEMOVE:
          GetClientRect( pWVT->hWnd, &pWVT->ciLast );  /* need in Paint function, client area before sizing started */
          pWVT->bResizing = HB_TRUE;
+         pWVT->bHasSelection     = HB_FALSE;
+         pWVT->bSelectionUpdated = HB_FALSE;
          return 0;
 
       case WM_EXITSIZEMOVE:
@@ -3112,6 +3241,8 @@ static LRESULT CALLBACK hb_gt_wvt_WndProc( HWND hWnd, UINT message, WPARAM wPara
          return 0;
 
       case WM_SIZE:
+		 pWVT->bHasSelection     = HB_FALSE;
+		 pWVT->bSelectionUpdated = HB_FALSE;
          if( ! pWVT->bFullScreen )
          {
             if( pWVT->bResizing && pWVT->ResizeMode == HB_GTI_RESIZEMODE_ROWS )
