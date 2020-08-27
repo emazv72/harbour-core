@@ -6,4 +6,9 @@ headers=${hb_name}.ch
 
 libs=${_HB_DYNPREF}${hb_name}${_HB_DYNSUFF}
 
-libs=rabbitmq
+#libs=rabbitmq
+
+{allwin&HBMK_HAS_RABBITMQ}libpaths=${HBMK_DIR_RABBITMQ}/../lib
+
+{HBMK_HAS_RABBITMQ&!hbdyn}libs=librabbitmq_4
+{HBMK_HAS_RABBITMQ&hbdyn}libs=rabbitmq_4
